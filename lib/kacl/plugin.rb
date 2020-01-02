@@ -1,5 +1,7 @@
-require 'fileutils'
-require 'json'
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
 
 module Danger
   # This is your plugin class. Any attributes or methods you expose here will
@@ -16,40 +18,54 @@ module Danger
   #
   #          my_plugin.warn_on_mondays
   #
-  # @see  Matthias Schmieder/danger-kacl
+  # @see  mschmieder/danger-kacl
   # @tags monday, weekends, time, rattata
   #
   class DangerKacl < Plugin
-    ERROR_FILE_NOT_SET = "kacl report file not set. Use 'kacl_changelog.report = \"kacl_report.json\"'.".freeze
-    ERROR_FILE_NOT_FOUND = "No file found at %s".freeze
+    ERROR_FILE_NOT_SET = "kacl report file not set. Use 'kacl_changelog.report = \"kacl_report.json\"'."
+    ERROR_FILE_NOT_FOUND = "No file found at %s"
 
-    attr_accessor :kacl_report_file
+    attr_accessor :report_file
+    attr_accessor :changelog_file
 
     def kacl_cli_installed?
       `which kacl-cli`.strip.empty? == false
     end
 
-    def kacl_report_file
-      @kacl_report_file || "kacl_report.json"
+    def report_file
+      @report_file || "kacl_report.json"
     end
 
+    def changelog_file
+      @changelog_file || nil
+    end
 
-    def is_valid
-      valid = kacl_report['valid']
-      if valid
-        message  "Changelog validity is '%s'" % [valid]
+    def validate
+      # Installs a prose checker if needed
+      system "pip3 install --user python-kacl" unless kacl_cli_installed?
+
+      # Check that this is in the user's PATH after installing
+      raise "kacl-cli is not in the user's PATH, or it failed to install" unless kacl_cli_installed?
+
+      if changelog_file.should.nil?
+        system "kacl-cli verify --json > #{report_file}"
       else
-        errors = kacl_report['errors']
+        system "kacl-cli -f #{changelog_file} verify --json > #{report_file}"
+      end
+      valid = kacl_report["valid"]
+      if valid
+        message  "Changelog validity is '#{valid}'"
+      else
+        errors = kacl_report["errors"]
 
-        for e in errors do
+        errors.each do |e|
           start_char_pos = 0
-          if e.key?("start_char_pos") and e['start_char_pos'] != nil
-            start_char_pos = e['start_char_pos']
+          if e.key?("start_char_pos") && e["start_char_pos"] != nil
+            start_char_pos = e["start_char_pos"]
           end
           fail "CHANGELOG:#{e['line_number']}:#{start_char_pos} error: #{e['error_message']}"
         end
       end
-
     end
 
     private
@@ -57,11 +73,11 @@ module Danger
     # Convenient method to not always parse the task file but keep it in the memory.
     #
     # @return [IniFile::Hash] The task report object.
-    def parse_kacl_report_file
-      raise ERROR_FILE_NOT_SET if kacl_report_file.nil? || kacl_report_file.empty?
-      raise format(ERROR_FILE_NOT_FOUND, kacl_report_file) unless File.exist?(kacl_report_file)
+    def parse_report_file
+      raise ERROR_FILE_NOT_SET if report_file.nil? || report_file.empty?
+      raise format(ERROR_FILE_NOT_FOUND, report_file) unless File.exist?(report_file)
 
-      file = File.read(kacl_report_file)
+      file = File.read(report_file)
       JSON.parse(file)
     end
 
@@ -69,7 +85,7 @@ module Danger
     #
     # @return [IniFile::Hash] The task report object.
     def kacl_report
-      @kacl_report ||= parse_kacl_report_file
+      @kacl_report ||= parse_report_file
     end
   end
 end
