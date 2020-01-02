@@ -61,7 +61,7 @@ module Danger
       # Check that this is in the user's PATH after installing
       raise "kacl-cli is not in the user's PATH, or it failed to install" unless kacl_cli_installed?
 
-      if changelog.should.nil?
+      if changelog.nil?
         system "kacl-cli verify --json > #{report}"
       else
         system "kacl-cli -f #{changelog} verify --json > #{report}"
