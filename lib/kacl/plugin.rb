@@ -67,11 +67,8 @@ module Danger
         system "kacl-cli -f #{changelog} verify --json > #{report}"
       end
       valid = kacl_report["valid"]
-      if valid
-        message  "Changelog validity is '#{valid}'"
-      else
+      if !valid
         errors = kacl_report["errors"]
-
         errors.each do |e|
           start_char_pos = 0
           if e.key?("start_char_pos") && !e["start_char_pos"].nil?
